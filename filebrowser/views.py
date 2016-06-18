@@ -8,7 +8,7 @@ from time import gmtime, strftime
 from django.shortcuts import render_to_response, HttpResponse
 from django.template import RequestContext as Context
 from django.http import HttpResponseRedirect
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import never_cache
 from django.utils.translation import ugettext as _
 from django.conf import settings
@@ -59,7 +59,7 @@ def browse(request):
         if directory is None:
             # The DIRECTORY does not exist, raise an error to prevent eternal redirecting.
             raise ImproperlyConfigured, _("Error finding Upload-Folder (MEDIA_ROOT + FILEBROWSER_DIRECTORY). Maybe it does not exist?")
-        redirect_url = reverse("fb_browse") + query_helper(query, "", "dir")
+	redirect_url = reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)) + query_helper(query, "", "dir")
         return HttpResponseRedirect(redirect_url)
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     
@@ -160,7 +160,7 @@ def browse(request):
         'breadcrumbs': get_breadcrumbs(query, path),
         'breadcrumbs_title': ""
     }, context_instance=Context(request))
-browse = staff_member_required(never_cache(browse))
+browse = login_required(never_cache(browse))
 
 
 # mkdir signals
@@ -180,7 +180,7 @@ def mkdir(request):
     if path is None:
         msg = _('The requested Folder does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)))
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     
     if request.method == 'POST':
@@ -201,7 +201,7 @@ def mkdir(request):
                 # on redirect, sort by date desc to see the new directory on top of the list
                 # remove filter in order to actually _see_ the new folder
                 # remove pagination
-                redirect_url = reverse("fb_browse") + query_helper(query, "ot=desc,o=date", "ot,o,filter_type,filter_date,q,p")
+                redirect_url = reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)) + query_helper(query, "ot=desc,o=date", "ot,o,filter_type,filter_date,q,p")
                 return HttpResponseRedirect(redirect_url)
             except OSError, (errno, strerror):
                 if errno == 13:
@@ -219,7 +219,7 @@ def mkdir(request):
         'breadcrumbs': get_breadcrumbs(query, path),
         'breadcrumbs_title': _(u'New Folder')
     }, context_instance=Context(request))
-mkdir = staff_member_required(never_cache(mkdir))
+mkdir = login_required(never_cache(mkdir))
 
 
 def upload(request):
@@ -235,7 +235,7 @@ def upload(request):
     if path is None:
         msg = _('The requested Folder does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)))
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     
     # SESSION (used for flash-uploading)
@@ -251,7 +251,7 @@ def upload(request):
         'breadcrumbs': get_breadcrumbs(query, path),
         'breadcrumbs_title': _(u'Upload')
     }, context_instance=Context(request))
-upload = staff_member_required(never_cache(upload))
+upload = login_required(never_cache(upload))
 
 
 @csrf_exempt
@@ -263,7 +263,7 @@ def _check_file(request):
     from django.utils import simplejson
     
     folder = request.POST.get('folder')
-    fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("fb_upload"))
+    fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("fb_upload", urlconf=getattr(request, 'urlconf', None)))
     folder = fb_uploadurl_re.sub('', folder)
     
     fileArray = {}
@@ -292,7 +292,7 @@ def _upload_file(request):
     
     if request.method == 'POST':
         folder = request.POST.get('folder')
-        fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("fb_upload"))
+        fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("fb_upload", urlconf=getattr(request, 'urlconf', None)))
         folder = fb_uploadurl_re.sub('', folder)
         abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, folder)
         if request.FILES:
@@ -301,12 +301,12 @@ def _upload_file(request):
             # PRE UPLOAD SIGNAL
             filebrowser_pre_upload.send(sender=request, path=request.POST.get('folder'), file=filedata)
             # HANDLE UPLOAD
-            uploadedfile = handle_file_upload(abs_path, filedata)
+	    uploadedfile = handle_file_upload(os.path.join(DIRECTORY, folder), filedata)
             # MOVE UPLOADED FILE
             # if file already exists
             if os.path.isfile(smart_str(os.path.join(MEDIA_ROOT, DIRECTORY, folder, filedata.name))):
                 old_file = smart_str(os.path.join(abs_path, filedata.name))
-                new_file = smart_str(os.path.join(abs_path, uploadedfile))
+                new_file = smart_str(os.path.join(MEDIA_ROOT, uploadedfile))
                 file_move_safe(new_file, old_file, allow_overwrite=True)
             # POST UPLOAD SIGNAL
             filebrowser_post_upload.send(sender=request, path=request.POST.get('folder'), file=FileObject(smart_str(os.path.join(DIRECTORY, folder, filedata.name))))
@@ -335,7 +335,7 @@ def delete(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)))
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     
     msg = ""
@@ -358,7 +358,7 @@ def delete(request):
                 # MESSAGE & REDIRECT
                 msg = _('The file %s was successfully deleted.') % (filename.lower())
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename,filetype")
+                redirect_url = reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)) + query_helper(query, "", "filename,filetype")
                 return HttpResponseRedirect(redirect_url)
             except OSError:
                 # todo: define error message
@@ -374,7 +374,7 @@ def delete(request):
                 # MESSAGE & REDIRECT
                 msg = _('The folder %s was successfully deleted.') % (filename.lower())
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename,filetype")
+                redirect_url = reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)) + query_helper(query, "", "filename,filetype")
                 return HttpResponseRedirect(redirect_url)
             except OSError:
                 # todo: define error message
@@ -391,7 +391,7 @@ def delete(request):
         'breadcrumbs': get_breadcrumbs(query, dir_name),
         'breadcrumbs_title': ""
     }, context_instance=Context(request))
-delete = staff_member_required(never_cache(delete))
+delete = login_required(never_cache(delete))
 
 
 # rename signals
@@ -417,7 +417,7 @@ def rename(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)))
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     file_extension = os.path.splitext(filename)[1].lower()
     
@@ -444,7 +444,7 @@ def rename(request):
                 # MESSAGE & REDIRECT
                 msg = _('Renaming was successful.')
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename")
+                redirect_url = reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)) + query_helper(query, "", "filename")
                 return HttpResponseRedirect(redirect_url)
             except OSError, (errno, strerror):
                 form.errors['name'] = forms.util.ErrorList([_('Error.')])
@@ -460,7 +460,7 @@ def rename(request):
         'breadcrumbs': get_breadcrumbs(query, path),
         'breadcrumbs_title': _(u'Rename')
     }, context_instance=Context(request))
-rename = staff_member_required(never_cache(rename))
+rename = login_required(never_cache(rename))
 
 
 def versions(request):
@@ -478,7 +478,7 @@ def versions(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("fb_browse", urlconf=getattr(request, 'urlconf', None)))
     abs_path = u'%s' % os.path.join(MEDIA_ROOT, DIRECTORY, path)
     
     return render_to_response('filebrowser/versions.html', {
@@ -489,6 +489,6 @@ def versions(request):
         'breadcrumbs': get_breadcrumbs(query, path),
         'breadcrumbs_title': _(u'Versions for "%s"') % filename
     }, context_instance=Context(request))
-versions = staff_member_required(never_cache(versions))
+versions = login_required(never_cache(versions))
 
 
