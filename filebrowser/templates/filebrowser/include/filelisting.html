@@ -8,7 +8,7 @@
             <td class="fb_icon">
                 {% selectable file.filetype query.type %}
                 {% if selectable %}
-                    <button class="button fb_selectlink" onclick="FileSubmit('{{ file.url_save }}', '{{ file.url_thumbnail }}', '{{ file.filetype }}');">{% trans "Select" %}</button>
+                    <button class="button fb_selectlink" onclick="FileSubmit('{{ file.url_save|fix_url  }}', '{{ file.url_thumbnail }}', '{{ file.filetype }}');">{% trans "Select" %}</button>
                 {% else %}
                     &nbsp;
                 {% endif %}
@@ -20,7 +20,7 @@
             <td class="fb_icon">
                 {% selectable file.filetype query.type %}
                 {% if selectable %}
-                    <button class="button fb_selectlink" onclick="FileBrowserDialogue.fileSubmit('{{ file.url_save|escapejs }}');">{% trans "Select" %}</button>
+                    <button class="button fb_selectlink" onclick="FileBrowserDialogue.fileSubmit('{{ file.url_save|fix_url|escapejs }}');">{% trans "Select" %}</button>
                 {% else %}
                     &nbsp;
                 {% endif %}
@@ -57,7 +57,7 @@
             <td><a href="{% url fb_browse %}{% query_string "" "q,dir,p" %}&amp;dir={{ file.path_relative_directory|urlencode }}"><strong>{{ file.filename }}</strong></a></td>
         {% else %}
             <td>
-                <b><a href="{{ file.url_full }}">{{ file.filename }}</a></b>
+                <b><a href="{{ file.url_full|fix_url }}">{{ file.filename }}</a></b>
                 {% if file.dimensions %}
                     <br /><span class="tiny">{{ file.dimensions.0 }} x {{ file.dimensions.1 }} px</span><br clear="all" />
                 {% endif %}

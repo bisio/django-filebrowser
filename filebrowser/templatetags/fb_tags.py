@@ -10,6 +10,9 @@ from filebrowser.settings import SELECT_FORMATS
 
 register = template.Library()
 
+@register.filter(name="fix_url")
+def fix_url(value):
+   return value.replace('/','',1).replace('https:/','https://') 
 
 @register.inclusion_tag('filebrowser/include/_response.html', takes_context=True)
 def query_string(context, add=None, remove=None):
